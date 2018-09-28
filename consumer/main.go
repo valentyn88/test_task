@@ -25,6 +25,7 @@ func main()  {
 
 func (api API) userHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
 	var u user.User
 	if err := decoder.Decode(&u); err != nil {
 		http.Error(w, fmt.Sprintf("Error while parsing request from reader service %s", err), http.StatusInternalServerError)
