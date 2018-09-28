@@ -7,6 +7,7 @@ import (
 	"strings"
 	"test_task/reader/user"
 	"test_task/reader/client"
+	"fmt"
 )
 
 func main()  {
@@ -38,4 +39,6 @@ func main()  {
 	if err := scanner.Err(); err != nil {
 		log.Fatalf("An error occured while reading csv file by reader service %s", err)
 	}
+
+	fmt.Printf("File %s was successfully imported\n", csvFile.Name())
 }
