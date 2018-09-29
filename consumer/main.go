@@ -1,34 +1,34 @@
 package main
 
 import (
-	custom_db "test_task/consumer/db"
-	"net/http"
-	"encoding/json"
-	"test_task/consumer/user"
 	"fmt"
+	"net"
+	"os"
+	"test_task/consumer/storage"
+	"test_task/user"
+
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
-type API struct {
-	db custom_db.DB
+type userServer struct {
+	storage storage.Storager
 }
 
-func NewAPI(db custom_db.DB) API {
-	return API{db:db}
+func (s userServer) Add(ctx context.Context, u *user.User) (*user.User, error) {
+	usr := s.storage.AddRow(*u)
+	return &usr, nil
 }
 
-func main()  {
-	db := custom_db.NewDB()
-	api := NewAPI(db)
-	http.HandleFunc("/", api.userHandler)
-	http.ListenAndServe(":9090", nil)
-}
-
-func (api API) userHandler(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	defer r.Body.Close()
-	var u user.User
-	if err := decoder.Decode(&u); err != nil {
-		http.Error(w, fmt.Sprintf("Error while parsing request from reader service %s", err), http.StatusInternalServerError)
+func main() {
+	srv := grpc.NewServer()
+	users := userServer{storage: storage.New()}
+	user.RegisterUsersServer(srv, users)
+	l, err := net.Listen("tcp", ":9090")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not listen to :9090 %s", err)
+		os.Exit(1)
 	}
-	api.db.AddRow(u)
+	fmt.Fprintln(os.Stderr, srv.Serve(l))
+	os.Exit(1)
 }

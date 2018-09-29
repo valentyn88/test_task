@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package user;
+
+message User {
+    int64 id = 1;
+    string name = 2;
+    string email = 3;
+    string mobile_number = 4;
+}
+
+service Users {
+    rpc Add(User) returns(User){}
+}

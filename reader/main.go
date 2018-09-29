@@ -1,19 +1,18 @@
 package main
 
 import (
-	"os"
 	"bufio"
-	"strings"
-	"test_task/reader/user"
+	"context"
 	"fmt"
-	"strconv"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc"
+	"os"
+	"test_task/user"
 )
 
-func main()  {
+func main() {
 	args := os.Args
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "not enough arguments to run reader service")
+		fmt.Fprintln(os.Stderr, "path to file as second param should be provided to run reader service")
 		os.Exit(1)
 	}
 
@@ -21,9 +20,17 @@ func main()  {
 	csvFile, err := os.Open(fPath)
 	defer csvFile.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "csv file can't be opened by reader service: %s", err)
+		fmt.Fprintf(os.Stderr, "could not open file by reader service: %s %s", fPath, err)
 		os.Exit(1)
 	}
+
+	conn, err := grpc.Dial(":9090", grpc.WithInsecure())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not connect to consumer service %s", err)
+		os.Exit(1)
+	}
+	client := user.NewUsersClient(conn)
+	ctx := context.Background()
 
 	scanner := bufio.NewScanner(csvFile)
 	for scanner.Scan() {
@@ -32,35 +39,24 @@ func main()  {
 			continue
 		}
 
-		row := strings.Split(line, ",")
-		if len(row) < 4 {
-			fmt.Fprintln(os.Stderr, "csv file row contains less than 4 params")
-			continue
-		}
-
-		id, err := strconv.ParseInt(row[0], 10, 64)
+		u, err := user.ConvStr2User(line)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not convert row id to int64: %s", err)
+			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
 
-		u := &user.User{
-			Id:id,
-			Name:row[1],
-			Email:row[2],
-			MobileNumber:row[3],
+		usr, err := client.Add(ctx, u)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not add user: %s", err)
+			continue
 		}
 
-		fmt.Print(proto.MarshalTextString(u))
-
-		//if err := client.RequestConsumer(u); err != nil {
-		//	log.Printf("An error occured while sending data to consumer service %s", err)
-		//}
+		fmt.Fprintf(os.Stdin, "user with id: %d was successfully added\n", usr.Id)
 	}
 
-	//if err := scanner.Err(); err != nil {
-	//	log.Fatalf("An error occured while reading csv file by reader service %s", err)
-	//}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "an error occured while reading csv file by reader service %s %s", csvFile.Name(), err)
+	}
 
-	fmt.Printf("File %s was successfully imported\n", csvFile.Name())
+	fmt.Printf("file '%s' was successfully imported\n", csvFile.Name())
 }
